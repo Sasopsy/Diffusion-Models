@@ -3,3 +3,5 @@ test1.ipynb
 vid.gif
 image.png
 __pycache__/
+landscapes/
+.DS_Store

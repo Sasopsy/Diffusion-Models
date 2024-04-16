@@ -31,7 +31,7 @@ class DDPMTrainer:
         """
         self.unet = model
         self.diffuser = diffuser
-        self.dataloader = dataloader,
+        self.dataloader = dataloader
         self.device = device
         self.optimizer = torch.optim.AdamW(self.unet.parameters(),learning_rate)
         self.criterion = nn.MSELoss()
