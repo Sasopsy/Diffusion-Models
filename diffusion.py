@@ -110,13 +110,14 @@ class DDPM:
                 x = 1/torch.sqrt(alpha) * (x-((1-alpha)/(torch.sqrt(1-alpha_hat)))*predicted_noise) + torch.sqrt(beta)*noise
                 if record_noise:
                     x_image = (x.clamp(-1, 1) + 1) / 2
-                    x_image = (x * 255).type(torch.uint8)
+                    x_image = (x_image * 255).type(torch.uint8)
                     noise_to_image.append(x_image)
                     
         model.train()
         x = (x.clamp(-1, 1) + 1) / 2
         x = (x * 255).type(torch.uint8)
         if record_noise:
+            noise_to_image.append(x)
             return x,noise_to_image
         else:
             return x
