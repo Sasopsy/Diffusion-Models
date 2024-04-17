@@ -118,6 +118,5 @@ class DDPM:
         x = (x * 255).type(torch.uint8)
         if record_noise:
             noise_to_image.append(x)
-            return x,noise_to_image
         else:
             return x
