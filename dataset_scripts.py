@@ -2,7 +2,6 @@ from PIL import Image
 import torch
 import os
 from torch.utils.data import Dataset
-from torchvision.transforms import Resize, ToTensor, Compose
 
 class Landscape(Dataset):
     

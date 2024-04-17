@@ -116,4 +116,7 @@ class DDPM:
         model.train()
         x = (x.clamp(-1, 1) + 1) / 2
         x = (x * 255).type(torch.uint8)
-        return x,noise_to_image
+        if record_noise:
+            return x,noise_to_image
+        else:
+            return x

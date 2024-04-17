@@ -5,3 +5,5 @@ image.png
 __pycache__/
 landscapes/
 .DS_Store
+model_weights/
+150_iter.png
