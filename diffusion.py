@@ -1,7 +1,7 @@
 from tqdm import tqdm
 import torch
 
-class DDPM:
+class DDPMScheduler:
     """
     Diffusion class for DDPMs.
 
