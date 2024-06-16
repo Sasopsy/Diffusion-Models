@@ -1,4 +1,4 @@
-from diffusion import DDPM
+from diffusion import DDPM_Scheduler
 import torch
 import torchvision
 from PIL import Image
@@ -36,7 +36,7 @@ def save_images(images, path, **kwargs):
     im.save(path)
     
 def generate_sample_video(model,
-                     diffuser: DDPM,
+                     diffuser: DDPM_Scheduler,
                      path,
                      num_images = 32,
                      fps = 25,
@@ -52,12 +52,14 @@ def generate_sample_video(model,
     fps (int): Frames per second for the output video.
     **kwargs: Additional keyword arguments passed to `torchvision.utils.make_grid` for image grid customization.
     """
-    _, noise_to_images = diffuser.sample(model,num_images,True)
+    image,noise_to_images = diffuser.sample(model,num_images,True)
+    _,noise_to_images = diffuser.convert(image,noise_to_images)
     grids = []
     for images in noise_to_images:
         images_grid = torchvision.utils.make_grid(images, **kwargs)
         ndarr = images_grid.permute(1, 2, 0).to('cpu').numpy()
         grids.append(Image.fromarray(ndarr))
     with imageio.get_writer(path, fps=fps) as writer:
-        for grid in grids:
-            writer.append_data(grid)
+        for i,grid in enumerate(grids):
+            if i%4 == 0:  # Only taking every four frames.
+                writer.append_data(grid)

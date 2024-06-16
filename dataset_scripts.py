@@ -12,7 +12,7 @@ class Landscape(Dataset):
         self.root_directory = root_directory
         self.transform = transform
         self.dataset = os.listdir(self.root_directory)
-        if '.DS_Store' in self.dataset:  # For MacOS.
+        if '.DS_Store' in self.dataset: 
             self.dataset.remove('.DS_Store') 
     
     def __len__(self):

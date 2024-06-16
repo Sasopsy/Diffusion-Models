@@ -1,5 +1,6 @@
 from tqdm import tqdm
 import torch
+from model import VAE,UNet
 
 class DDPMScheduler:
     """
@@ -61,8 +62,8 @@ class DDPMScheduler:
         """
         sqrt_alpha_hat = torch.sqrt(self.alpha_hat[t])[:, None, None, None]
         sqrt_one_minus_alpha_hat = torch.sqrt(1 - self.alpha_hat[t])[:, None, None, None]
-        Ɛ = torch.randn_like(x)
-        return sqrt_alpha_hat * x + sqrt_one_minus_alpha_hat * Ɛ, Ɛ
+        epsilon = torch.randn_like(x)
+        return sqrt_alpha_hat * x + sqrt_one_minus_alpha_hat * epsilon, epsilon
 
     def sample_timesteps(self, n):
         """
@@ -96,27 +97,100 @@ class DDPMScheduler:
         if record_noise:
             noise_to_image = []
         with torch.no_grad():
-            x = torch.randn((n, 3, self.img_size[0], self.img_size[1])).to(self.device)
+            x = torch.randn((n,3,self.img_size[0],self.img_size[1])).to(self.device)
             for i in tqdm(reversed(range(1, self.noise_steps)), position=0):
-                t = (torch.ones(n) * i).long().to(self.device)
+                t = (torch.ones(n)*i).long().to(self.device)
                 predicted_noise = model(x, t)
-                alpha = self.alpha[t][:, None, None, None]
-                alpha_hat = self.alpha_hat[t][:, None, None, None]
-                beta = self.beta[t][:, None, None, None]
+                alpha = self.alpha[t][:,None,None,None]
+                alpha_hat = self.alpha_hat[t][:,None,None,None]
+                beta = self.beta[t][:,None,None,None]
                 if i > 1:
                     noise = torch.randn_like(x)
                 else:
                     noise = torch.zeros_like(x)
                 x = 1/torch.sqrt(alpha) * (x-((1-alpha)/(torch.sqrt(1-alpha_hat)))*predicted_noise) + torch.sqrt(beta)*noise
                 if record_noise:
-                    x_image = (x.clamp(-1, 1) + 1) / 2
-                    x_image = (x_image * 255).type(torch.uint8)
-                    noise_to_image.append(x_image)
+                    noise_to_image.append(x)
                     
         model.train()
-        x = (x.clamp(-1, 1) + 1) / 2
-        x = (x * 255).type(torch.uint8)
         if record_noise:
             return x,noise_to_image
         else:
             return x
+        
+    def convert(self,
+                image,
+                noise_to_image = None):
+        # Scale up the noise.
+        if noise_to_image:
+            for x in noise_to_image:
+                x = (x.clamp(-1,1)+1) / 2
+                x = (x * 255).type(torch.uint8)
+        # Scale up the image.
+        image = (image.clamp(-1,1)+1) / 2
+        image = (image * 255).type(torch.uint8)
+        if noise_to_image:
+            return image,noise_to_image
+        else: 
+            return image
+                
+                
+class LDM:
+    
+    def __init__(self,
+                 vae: VAE,
+                 unet: UNet,
+                 scheduler: DDPMScheduler,
+                 device = "cpu"):
+        self.device = device
+        self.vae = vae
+        self.unet = unet
+        self.scheduler = scheduler
+        self.vae.to(device)
+        self.unet.to(device)
+        for params in self.vae.parameters():
+            params.requires_grad = False
+        
+    def encode(self, x):
+        mu,logvar = self.vae.encoder(x)
+        z = self.vae.reparametrize(mu,logvar)
+        return z
+    
+    def decode(self,z):
+        return self.vae.decoder(z)
+    
+    def sample(self,
+               n,
+               record_noise = False):
+        if record_noise: 
+            z,noise_to_image = self.scheduler.sample(self.unet,n,record_noise)
+            image = self.decode(z)
+            for noisy_image in noise_to_image:
+                noisy_image = self.decode(noisy_image)
+            return image,noise_to_image
+        else:
+            z = self.scheduler.sample(self.unet,n,record_noise)
+            return self.decode(z)
+        
+    def convert(self,
+                image,
+                noise_to_image = None):
+        # Scale up the noise.
+        if noise_to_image:
+            for x in noise_to_image:
+                x = (x.clamp(-1,1)+1) / 2
+                x = (x * 255).type(torch.uint8)
+        # Scale up the image.
+        image = (image.clamp(-1,1)+1) / 2
+        image = (image * 255).type(torch.uint8)
+        if noise_to_image:
+            return image,noise_to_image
+        else: 
+            return image
+        
+    def save(self,path):
+        torch.save(
+            {'vae':self.vae.state_dict(),
+             'unet':self.unet.state_dict()},
+        path    
+        )

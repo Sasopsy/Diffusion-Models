@@ -30,6 +30,7 @@ from utils import save_images
 num_images = 32  # Can be any number
 scheduler = DDPMScheduler(1000,1e-4,0.02,(64,64))
 images = scheduler.sample(unet,num_images,False)
+images = scheduler.convert(images)
 
 save_images(images,'save/path.png')
 ```
