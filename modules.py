@@ -200,7 +200,10 @@ class Up(nn.Module):
         emb = self.emb_layer(t)[:, :, None, None].repeat(1, 1, x.shape[-2], x.shape[-1])
         return x + emb
     
-    
+
+def is_power_of_two(n):
+    return (n & (n - 1) == 0) and n != 0
+
 class UpVAE(nn.Module):
     
     def __init__(self,
@@ -211,9 +214,9 @@ class UpVAE(nn.Module):
         
         self.up = nn.Upsample(scale_factor=2,mode="bilinear",align_corners=True)
         self.conv = nn.Sequential(
-            DoubleConv(in_channels,in_channels,residual=True),
-            SelfAttention(in_channels,num_heads),
-            DoubleConv(in_channels,out_channels,in_channels//2)
+            DoubleConv(in_channels, in_channels, residual=True),
+            SelfAttention(in_channels, num_heads),
+            DoubleConv(in_channels, out_channels, in_channels // 2)
         )
         
     def forward(self, x):
@@ -231,14 +234,14 @@ class DownVAE(nn.Module):
         super().__init__()
         self.conv = nn.Sequential(
             nn.MaxPool2d(2),
-            DoubleConv(in_channels,in_channels,residual=True),
-            SelfAttention(in_channels,num_heads),
-            DoubleConv(in_channels,out_channels)
+            DoubleConv(in_channels, in_channels, residual=True),
+            SelfAttention(in_channels, num_heads),
+            DoubleConv(in_channels, out_channels)
         )
         
     def forward(self, x):
         return self.conv(x)
-    
+
 
 class Encoder(nn.Module):
     
@@ -246,37 +249,36 @@ class Encoder(nn.Module):
                  downsample_factor: int,
                  latent_dim: int,
                  in_channels: int = 3,
-                 num_heads: int = 4
-                 ):
+                 num_heads: int = 4):
         super().__init__()
-        assert downsample_factor%2 == 0, "downsample_factor must be a multiple of 2"
-        num_layers = downsample_factor//2
-        self.init_conv = nn.Conv2d(in_channels=in_channels,out_channels=16,kernel_size=1)
-        self.downsampling_layers = nn.Sequential(*[DownVAE(16*(2**i),32*(2**i),num_heads) for i in range(num_layers)])
-        self.conv_mu = nn.Conv2d(in_channels=32*downsample_factor, out_channels=latent_dim, kernel_size=1)
-        self.conv_logvar = nn.Conv2d(in_channels=32*downsample_factor, out_channels=latent_dim, kernel_size=1)
+        assert is_power_of_two(downsample_factor), "downsample_factor must be a power of 2"
+        num_layers = int(torch.log2(torch.tensor(downsample_factor)))
+        self.init_conv = nn.Conv2d(in_channels=in_channels, out_channels=16, kernel_size=3, padding=1)
+        self.downsampling_layers = nn.Sequential(*[DownVAE(16 * (2 ** i), 16 * (2 ** (i + 1)), num_heads) for i in range(num_layers)])
+        self.conv_mu = nn.Conv2d(in_channels=16 * (2 ** num_layers), out_channels=latent_dim, kernel_size=1)
+        self.conv_logvar = nn.Conv2d(in_channels=16 * (2 ** num_layers), out_channels=latent_dim, kernel_size=1)
         
     def forward(self, x):
         x = self.init_conv(x)
         x = self.downsampling_layers(x)
         mu = self.conv_mu(x)
         logvar = self.conv_logvar(x)
-        return mu,logvar
-    
+        return mu, logvar
+
 
 class Decoder(nn.Module):
     
     def __init__(self, 
                  upsample_factor: int,
-                 latent_dim,
+                 latent_dim: int,
                  out_channels: int = 3,
                  num_heads: int = 4):
         super().__init__()
-        assert upsample_factor%2 == 0, "downsample_factor must be a multiple of 2"
-        num_layers = upsample_factor//2
-        self.init_conv = nn.Conv2d(in_channels=latent_dim,out_channels=32*upsample_factor,kernel_size=1)
-        self.upsampling_layers = nn.Sequential(*[UpVAE(32*(2**i),16*(2**i),num_heads) for i in reversed(range(num_layers))])
-        self.final_layer = nn.Conv2d(in_channels=16,out_channels=out_channels,kernel_size=1)
+        assert is_power_of_two(upsample_factor), "upsample_factor must be a power of 2"
+        num_layers = int(torch.log2(torch.tensor(upsample_factor)))
+        self.init_conv = nn.Conv2d(in_channels=latent_dim, out_channels=16 * (2 ** num_layers), kernel_size=1)
+        self.upsampling_layers = nn.Sequential(*[UpVAE(16 * (2 ** (i + 1)), 16 * (2 ** i), num_heads) for i in reversed(range(num_layers))])
+        self.final_layer = nn.Conv2d(in_channels=16, out_channels=out_channels, kernel_size=3, padding=1)
         
     def forward(self, z):
         z = self.init_conv(z)

@@ -1,4 +1,4 @@
-from diffusion import DDPM_Scheduler
+from diffusion import DDPMScheduler
 import torch
 import torchvision
 from PIL import Image
@@ -20,6 +20,7 @@ def plot_images(images):
     ], dim=-2).permute(1, 2, 0).cpu())
     plt.show()
 
+
 def save_images(images, path, **kwargs):
     """
     Saves a grid of images to a specified path using Pillow.
@@ -35,8 +36,9 @@ def save_images(images, path, **kwargs):
     print("here")
     im.save(path)
     
+    
 def generate_sample_video(model,
-                     diffuser: DDPM_Scheduler,
+                     diffuser: DDPMScheduler,
                      path,
                      num_images = 32,
                      fps = 25,
@@ -63,3 +65,9 @@ def generate_sample_video(model,
         for i,grid in enumerate(grids):
             if i%4 == 0:  # Only taking every four frames.
                 writer.append_data(grid)
+        
+def convert(image):
+    # Scale up the image.
+    image = (image.clamp(-1,1)+1) / 2
+    image = (image * 255).type(torch.uint8)
+    return image
