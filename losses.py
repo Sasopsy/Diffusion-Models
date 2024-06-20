@@ -24,11 +24,12 @@ class PerceptualLoss(nn.Module):
     """
     def __init__(self, selected_layers: tuple[int],
                  model: str,
-                 device: str) -> None:
+                 device: str,
+                 reduction: str = 'mean') -> None:
         super(PerceptualLoss,self).__init__()
         self.model = fetch_model(model).eval().to(device)
         self.selected_layers = sorted(selected_layers)
-        self.loss = nn.MSELoss()
+        self.loss = nn.MSELoss(reduction=reduction)
         
         # Freeze the vgg parameters
         for params in self.model.parameters():
@@ -102,10 +103,11 @@ class PerceptualMse(PerceptualLoss):
     def __init__(self, selected_layers: tuple[int],
                  model: str,
                  device: str, 
-                 perceptual_weight: float) -> None:
-        super(PerceptualMse,self).__init__(selected_layers,model,device)
+                 perceptual_weight: float,
+                 reduction: str = 'mean') -> None:
+        super(PerceptualMse,self).__init__(selected_layers,model,device,reduction)
         # Define Mse loss
-        self.mse_loss = nn.MSELoss()
+        self.mse_loss = nn.MSELoss(reduction=reduction)
         self.perceptual_weight = perceptual_weight
         
     def forward(self, original_image: torch.Tensor,
